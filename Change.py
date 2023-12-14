@@ -29,12 +29,18 @@ def convert(input_lst,output_type):
                         lines = content.split('\n')
 
                         # Set the starting y-coordinate for drawing text
-                        y_coordinate = 700
+                        y_coordinate = 800
 
                         # Draw each line of text
                         for line in lines:
+                            if y_coordinate <=0:
+                                pdf_buffer.showPage()
+                                y_coordinate = 800
+                                pass
                             pdf_buffer.drawString(30, y_coordinate, line)
                             y_coordinate -= 12  # Adjust this value based on your font size and line spacing
+                        
+                        
                         
                         pdf_buffer.save()
 

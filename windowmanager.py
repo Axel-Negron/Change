@@ -72,7 +72,7 @@ class MainWindow(tk.Tk):
         self.userinput = ttk.Entry(self.consoleframe, textvariable=self.command,style="Console.TFrame")
         self.userinput.pack(side='top', anchor='nw', padx=5, pady=5,ipadx=280,ipady=10)
         self.userinput.bind('<Return>', lambda event: self.send_to_terminal(self.userinput.get(), self.console_text))
-
+        
 
 
         self.lineframe = ttk.Frame(self.lowerframe, height=1000, width=1, style="Primary.TFrame")
