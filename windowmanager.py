@@ -38,6 +38,7 @@ class MainWindow(tk.Tk):
         self.colors = ["#E5E9EC", "#D0D7DD", "#7C616C"]
         self.directory = tk.StringVar()
         self.command = tk.StringVar()
+        self.iconbitmap("icon/Change.ico")
 
         style = ttk.Style(self)
         style.configure("Primary.TFrame", background=self.colors[0])
