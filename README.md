@@ -1,6 +1,5 @@
 # Change Application
 
-![Change Logo]
 
 The **Change** application is a Windows versatile file conversion tool that allows you to convert between different document formats. As of now, the application supports the following formats: DOCX, TXT, and PDF. You can convert both from and to each of these types seamlessly.
 
