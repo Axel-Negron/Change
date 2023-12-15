@@ -66,7 +66,9 @@ class MainWindow(tk.Tk):
         self.consoleframe = ttk.Frame(self.lowerframe,style="Primary.TFrame")
         self.consoleframe.pack(side="left", anchor='nw', padx=10, pady=10,ipady=200)
 
-        self.console_text = tk.Text(self.consoleframe, foreground='white', background='black', height=35, width=70)
+        self.consolelbl = ttk.Label(self.consoleframe, text="Console",font=('Arial', 15, 'bold'), foreground='black', background=self.colors[0])
+        self.consolelbl.pack(side='top',anchor='nw')
+        self.console_text = tk.Text(self.consoleframe, foreground='white', background='black', height=32, width=70)
         self.console_text.configure(state='disabled')
         self.console_text.pack(side='top', anchor='nw', padx=5, pady=5)
 
@@ -86,8 +88,11 @@ class MainWindow(tk.Tk):
         # Add a line in canvas widget
         canvas.create_line(0, 0, 0, 1000, fill='black', width=20)
         
+        
+        self.listfileslbl = ttk.Label(self.lowerframe, text="Queue:",font=('Arial', 15, 'bold'), foreground='black', background=self.colors[0])
+        self.listfileslbl.pack(side='top',anchor='nw',pady=15)
         self.listfiles = tk.Listbox(self.lowerframe, width=70, height=5,background='black',foreground='white')
-        self.listfiles.pack(pady=15)
+        self.listfiles.pack()
         self.listfiles.bind("<Double-Button-1>",lambda event:remove_file(self.listfiles))
         
         self.fileconverterframe = ttk.Frame(self.lowerframe,style="Primary.TFrame")
@@ -158,6 +163,28 @@ class MainWindow(tk.Tk):
                 self.convertto['values'] = ('txt','docx')
                 self.startbutton.configure(state='normal')
                 pass
+            
+            case"mp3":
+                self.convertto.set('')
+                self.conversionlabel.configure(text="Convert from MP3 to: ")
+                self.convertto['values'] = ('wav','flac')
+                self.startbutton.configure(state='normal')
+                pass
+            
+            case"lac":
+                self.convertto.set('')
+                self.conversionlabel.configure(text="Convert from FLAC to: ")
+                self.convertto['values'] = ('mp3','wav')
+                self.startbutton.configure(state='normal')
+                pass
+            
+            case"wav":
+                self.convertto.set('')
+                self.conversionlabel.configure(text="Convert from WAV to: ")
+                self.convertto['values'] = ('mp3','flac')
+                self.startbutton.configure(state='normal')
+                pass
+                
     
     def beginconvert(self):
         self.send_to_terminal("Beginning conversion...", self.console_text)
