@@ -100,6 +100,8 @@ class MainWindow(tk.Tk):
         self.startbutton = ttk.Button(self.fileconverterframe,text="Begin",state='disabled',command= lambda: self.beginconvert())
         self.startbutton.pack(side="top",pady=10)
         
+        self.send_to_terminal("Welcome To Change, A File Converter", self.console_text)
+        
     def send_to_terminal(self, text, terminal_text, max_lines=36):
         if text == "":
             return
@@ -122,6 +124,8 @@ class MainWindow(tk.Tk):
         
     def getdirectory(self,listbox:tk.Listbox):
         selected_directory = filedialog.askopenfilenames()
+        if(selected_directory == ""):
+            return
         if selected_directory:
             self.directory.set(selected_directory)
             self.fileselector.delete(0, tk.END)  # Clear the current content
@@ -135,17 +139,23 @@ class MainWindow(tk.Tk):
             case"txt":
                 self.convertto.set('')
                 self.conversionlabel.configure(text="Convert from TXT to: ")
-                self.convertto['values'] = ('pdf','docx','doc')
+                self.convertto['values'] = ('pdf','docx')
                 self.startbutton.configure(state='normal')
   
                 pass
             
-            case "docx":
+            case "ocx":
                 self.convertto.set('')
+                self.conversionlabel.configure(text="Convert from DOCX to: ")
+                self.convertto['values'] = ('txt','pdf')
+                self.startbutton.configure(state='normal')
                 pass
             
             case"pdf":
                 self.convertto.set('')
+                self.conversionlabel.configure(text="Convert from PDF to: ")
+                self.convertto['values'] = ('txt','docx')
+                self.startbutton.configure(state='normal')
                 pass
     
     def beginconvert(self):
@@ -165,9 +175,12 @@ class MainWindow(tk.Tk):
                 files.append(item)
         self.send_to_terminal("Converting this may take a while =]", self.console_text)
         Change.convert(files,self.convertto.get())
-        self.send_to_terminal("File was converted succesfully =]", self.console_text)
-    
-            
+        self.send_to_terminal("Done, check output folder to see results =]", self.console_text)
+        self.convertto.set('')
+        self.listfiles.delete(0,tk.END)
+        self.conversionlabel.configure(text="Choose file or files to convert")
+        self.startbutton.configure(state='disabled')
+        
         pass         
 
 if __name__ == "__main__":

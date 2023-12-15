@@ -11,15 +11,10 @@ def convert(input_lst,output_type):
             match output_type:
                 case "pdf":
                     from reportlab.pdfgen import canvas
-                    
-                    output_batch = []
-                    file_names = []
-
                     for file_directory in input_lst:
                         with open(file_directory, 'r', encoding='utf-8') as txt_file:
                             content = txt_file.read()
                             
-
                         pdf_buffer  = canvas.Canvas(f"output/{os.path.basename(file_directory)}.pdf")
 
                         # Set font and size
@@ -40,40 +35,66 @@ def convert(input_lst,output_type):
                             pdf_buffer.drawString(30, y_coordinate, line)
                             y_coordinate -= 12  # Adjust this value based on your font size and line spacing
                         
-                        
-                        
                         pdf_buffer.save()
 
                     return 
      
                 case "docx":
-                    pass
+                    from docx import Document
+                    import re
+                    
+                    for filepath in input_lst:
+                        with open(filepath, 'r', encoding='utf-8') as txt_file:
+                            content = txt_file.read()
+                            
+                        doc = Document()
+                        doc.add_heading(filepath+" Created by Change",0)
+                        file_content = re.sub(r"[^\x00-\x7F]+|\x0c", " ", content)
+                        doc.add_paragraph(file_content)
+                        output_filepath = f"output/{os.path.basename(filepath)}.docx"
+                        doc.save(output_filepath)
+                        
+                        
+                        
+                    return
+
             pass
         
-        case "docx":
+        case "ocx":
             match output_type:
                 case "pdf":
-                    pass
+                    from docx2pdf import convert
+                    for filedirectory in input_lst:
+                        convert(filedirectory,f"output/{os.path.basename(filedirectory)}.pdf")
+                    return
                 case "txt":
-                    pass
+                    from docx2txt import process 
+                    for filedirectory in input_lst:
+                        with open(f"output/{os.path.basename(filedirectory)}.txt", 'w', encoding='utf-8') as txt_file:
+                            txt_file.write(process(filedirectory))
+                    return
             
             pass
         
         case "pdf":
             match output_type:
                 case "txt":
-                    pass
+                    from PyPDF2 import PdfReader
+                    
+                    for filedirectory in input_lst:
+                        pdf = PdfReader(filedirectory)
+                        pdf_text = ""
+                        for page in pdf.pages:
+                            pdf_text += page.extract_text()
+                        with open(f"output/{os.path.basename(filedirectory)}.txt", 'w', encoding='utf-8') as txt_file:
+                            txt_file.write(pdf_text)
+                    
+                    return
                 case "docx":
-                    pass
+                    from pdf2docx import parse
+                    for filedirectory in input_lst:
+                        parse(filedirectory,f"output/{os.path.basename(filedirectory)}.docx")
+                    
+                    return
             
             pass
-        
-        case "doc":
-            match output_type:
-                case "pdf":
-                    pass
-                case "txt":
-                    pass
-            
-            pass
-    
