@@ -149,7 +149,6 @@ class MainWindow(tk.Tk):
             self.shareframe.destroy()
             self.shareqr_label.destroy()
 
-            
         except:
             pass
         
@@ -190,9 +189,10 @@ class MainWindow(tk.Tk):
         
 
     def start_http_server(self, host, port, fileaddress, sharedir):
-        # Define the HTTP server handler
+    # Define the HTTP server handler
         class MyHandler(http.server.SimpleHTTPRequestHandler):
             file_downloaded = False
+            server_instance = None
 
             def do_GET(self):
                 super().do_GET()
@@ -204,13 +204,14 @@ class MainWindow(tk.Tk):
                     self.end_headers()
                     shutil.rmtree(sharedir)
                     print("Done")
-                    self.server.server_close()
+                    self.server_instance.shutdown()
 
         # Attempt to bind to different ports until an available one is found
         for i in range(10):
             try:
                 current_port = port + i
                 with socketserver.TCPServer((host, current_port), MyHandler) as httpd:
+                    MyHandler.server_instance = httpd
                     print(f"HTTP server listening on {host}:{current_port}")
 
                     # Create QR code and display it
@@ -230,6 +231,10 @@ class MainWindow(tk.Tk):
                     img.save(os.path.join(static_folder, f'qrcode-{sharedir}.png'))
                     resized = img.resize((200, 200))
 
+                    # Clear the previous frame
+                    if hasattr(self, 'shareframe'):
+                        self.shareframe.destroy()
+
                     # Display QR code
                     self.shareframe = ttk.Frame(self.lowerframe, style="Secondary.TFrame")
                     self.shareframe.pack(padx=5, pady=5, side="top")
@@ -238,13 +243,19 @@ class MainWindow(tk.Tk):
                     self.shareqr_label.pack(side='top')
 
                     # Start serving
-                    try:
-                        self.send_to_terminal(f"Server attempt on address {host}:{current_port}", self.console_text)
-                        httpd.serve_forever()
-                        
-                    except:
-                        pass
-                    self.send_to_terminal("Server running, scan QR code to download", self.console_text)
+                    httpd_thread = threading.Thread(target=httpd.serve_forever)
+                    self.send_to_terminal(f"Server attempt on address {host}:{current_port}. Scan QR code to download", self.console_text)
+                    httpd_thread.start()
+
+                    # Wait for the file to be downloaded or an exception to occur
+                    httpd_thread.join()
+
+                    # Check if the file was downloaded successfully
+                    if MyHandler.file_downloaded:
+                        self.send_to_terminal(f"Server running on address {host}:{current_port}. Scan QR code to download", self.console_text)
+                        break
+                    else:
+                        self.send_to_terminal(f"Error starting server on port {current_port}. Trying the next one.", self.console_text)
             except OSError as e:
                 if "Only one usage" in str(e):  # Port already in use
                     self.send_to_terminal(f"Port {current_port} in use, trying the next one.", self.console_text)
@@ -254,6 +265,7 @@ class MainWindow(tk.Tk):
             except Exception as e:
                 self.send_to_terminal(f"Error starting server: {e}", self.console_text)
                 break
+
         
     def send_to_terminal(self, text, terminal_text, max_lines=36):
         if text == "":
