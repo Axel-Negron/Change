@@ -98,3 +98,57 @@ def convert(input_lst,output_type):
                     return
             
             pass
+
+        case "mp3":
+            
+            if output_type == "wav":
+                
+                from pydub import AudioSegment
+                
+                for file_directory in input_lst:
+                    song = AudioSegment.from_mp3(file_directory)
+                    song.export(f"output/{os.path.basename(file_directory)}.wav", format="wav")
+                return
+
+            elif output_type == "flac":
+                
+                from pydub import AudioSegment
+                
+                for file_directory in input_lst:
+                    song = AudioSegment.from_mp3(file_directory)
+                    song.export(f"output/{os.path.basename(file_directory)}.flac", format="flac")
+                return
+        
+        case"lac":
+            
+            if output_type == "wav":
+                
+                import ffmpeg
+                for file_directory in input_lst:
+                    ffmpeg.input(file_directory).output(f"output/{os.path.basename(file_directory)}.wav").run()
+                return
+            
+            if output_type == "mp3":
+                
+                import ffmpeg
+                for file_directory in input_lst:
+                    ffmpeg.input(file_directory).output(f"output/{os.path.basename(file_directory)}.mp3").run()
+                return
+        
+        case"wav":
+            
+            if output_type == "mp3":
+                
+                import ffmpeg
+                for file_directory in input_lst:
+                    ffmpeg.input(file_directory).output(f"output/{os.path.basename(file_directory)}.mp3").run()
+                return
+            
+            if output_type == "flac":
+                
+                import ffmpeg
+                for file_directory in input_lst:
+                    ffmpeg.input(file_directory).output(f"output/{os.path.basename(file_directory)}.flac").run()
+                return
+         
+               

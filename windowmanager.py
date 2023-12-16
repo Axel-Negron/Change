@@ -3,6 +3,15 @@ from tkinter import ttk
 from tkinter import filedialog
 from tkinter.messagebox import showerror, showwarning, showinfo
 import Change
+import qrcode
+import os
+import random
+import shutil
+import http.server
+import socketserver
+import threading
+from PIL import Image, ImageTk
+
 
 def on_entry_click(event, entry: tk.Entry):
     if entry.get() == directory_path:
@@ -33,12 +42,18 @@ class MainWindow(tk.Tk):
     def __init__(self):
         super().__init__()
 
-        self.geometry('1280x720')
+        self.geometry('1280x800')
+        self.resizable(False, False)
         self.title('Change')
         self.colors = ["#E5E9EC", "#D0D7DD", "#7C616C"]
         self.directory = tk.StringVar()
         self.command = tk.StringVar()
         self.iconbitmap("icon/Change.ico")
+        self.ip = tk.StringVar()
+        self.share_locally = tk.BooleanVar()
+        self.share_locally = 1
+
+        
 
         style = ttk.Style(self)
         style.configure("Primary.TFrame", background=self.colors[0])
@@ -66,7 +81,9 @@ class MainWindow(tk.Tk):
         self.consoleframe = ttk.Frame(self.lowerframe,style="Primary.TFrame")
         self.consoleframe.pack(side="left", anchor='nw', padx=10, pady=10,ipady=200)
 
-        self.console_text = tk.Text(self.consoleframe, foreground='white', background='black', height=35, width=70)
+        self.consolelbl = ttk.Label(self.consoleframe, text="Console",font=('Arial', 15, 'bold'), foreground='black', background=self.colors[0])
+        self.consolelbl.pack(side='top',anchor='nw')
+        self.console_text = tk.Text(self.consoleframe, foreground='white', background='black', height=32, width=70)
         self.console_text.configure(state='disabled')
         self.console_text.pack(side='top', anchor='nw', padx=5, pady=5)
 
@@ -86,8 +103,11 @@ class MainWindow(tk.Tk):
         # Add a line in canvas widget
         canvas.create_line(0, 0, 0, 1000, fill='black', width=20)
         
+        
+        self.listfileslbl = ttk.Label(self.lowerframe, text="Queue:",font=('Arial', 15, 'bold'), foreground='black', background=self.colors[0])
+        self.listfileslbl.pack(side='top',anchor='nw',pady=15)
         self.listfiles = tk.Listbox(self.lowerframe, width=70, height=5,background='black',foreground='white')
-        self.listfiles.pack(pady=15)
+        self.listfiles.pack()
         self.listfiles.bind("<Double-Button-1>",lambda event:remove_file(self.listfiles))
         
         self.fileconverterframe = ttk.Frame(self.lowerframe,style="Primary.TFrame")
@@ -99,11 +119,164 @@ class MainWindow(tk.Tk):
         self.convertto.pack(side="left",anchor='nw',padx=5,pady=10)
         
         self.startbutton = ttk.Button(self.fileconverterframe,text="Begin",state='disabled',command= lambda: self.beginconvert())
-        self.startbutton.pack(side="top",pady=10)
+        self.startbutton.pack(side="top",pady=(0,20))
         
         self.send_to_terminal("Welcome To Change, A File Converter", self.console_text)
         
+        
+        
+        
+        self.sharelbl = ttk.Label(self.lowerframe, text="Share files locally:",font=('Arial', 20, 'bold'), foreground='black', background=self.colors[0])
+        self.sharelbl.pack(side='top',anchor='nw',pady=(20,0))
+        
+        
+        # self.optionfrm = ttk.Frame(self.lowerframe,style="Primary.TFrame")
+        # self.optionfrm.pack(side="top", anchor='nw')
+        
+        # # self.sharelocallychk = ttk.Checkbutton(self.optionfrm, text="Share locally", variable=self.share_locally, onvalue=1, offvalue=0) 
+        # # self.sharelocallychk.pack(side="left", anchor='nw')
+        
+        self.useriplbl = ttk.Label(self.lowerframe, text="IP w/ port (example: 127.0.0.1:8000):",font=('Arial', 15, 'bold'), foreground='black', background=self.colors[0])
+        self.useriplbl.pack(side='top',anchor='nw')
+        self.userip = ttk.Entry(self.lowerframe, textvariable=self.ip,style="Console.TFrame")
+        self.userip.pack(side='top', anchor='nw', padx=5, pady=(0,5),ipadx=250,ipady=10)
+        
+        self.sharefileslbl = ttk.Label(self.lowerframe, text="Queued files to share:",font=('Arial', 15, 'bold'), foreground='black', background=self.colors[0])
+        self.sharefileslbl.pack(side='top',anchor='nw')
+        self.sharefiles = tk.Listbox(self.lowerframe, width=72, height=2,background='black',foreground='white')
+        self.sharefiles.pack(pady=(0,5),anchor='nw')
+        self.sharefiles.bind("<Double-Button-1>",lambda event:remove_file(self.sharefiles))
+        
+        
+        
+        self.picksharedir = ttk.Button(self.lowerframe, text="Browse", command=lambda: self.getdirectory(self.sharefiles))
+        self.picksharedir.pack(ipadx=200)
+        self.sharefilesbtn = ttk.Button(self.lowerframe, text="Share", command=lambda: self.share())
+        self.sharefilesbtn.pack(ipadx=200)
+        
+        self.shareframe = ttk.Frame(self.lowerframe, style="Secondary.TFrame")
+        self.shareframe.pack(padx=5, pady=5, side="top")
+        
+        
+    def share(self):
+        """Shares selected files by creating a zip file and generating a QR code"""
+        try:
+            self.shareqr_label.destroy()
+        except:
+            pass
+        
+        self.send_to_terminal("Beginning share, creating zip file", self.console_text)
+        
+        if not self.sharefiles.get(0, tk.END):
+            self.send_to_terminal("No files selected", self.console_text)
+            return
+        
+        sharedir = f"share-{random.randint(0, 100)}"
+        os.makedirs(sharedir, exist_ok=True)
+        os.makedirs(f'{sharedir}/share-rawfile', exist_ok=True)
+        
+        self.send_to_terminal("Copying files", self.console_text)
+        for file in self.sharefiles.get(0, tk.END):
+            shutil.copy(file, f"{sharedir}/share-rawfile")
+            
+        fileaddress = f"{sharedir}/{sharedir}.zip"
+        self.send_to_terminal("Done", self.console_text)
+        self.send_to_terminal("Zipping files", self.console_text)
+        shutil.make_archive(fileaddress, 'zip', f"{sharedir}/share-rawfile")
+
+        self.send_to_terminal("Creating QR code", self.console_text)
+
+        address_parts = self.ip.get().split(':')
+        if len(address_parts) < 2:
+            self.send_to_terminal("No port specified, defaulting to 8000", self.console_text)
+            address_parts.append(8000)
+        
+        host = address_parts[0]
+        port = int(address_parts[1])
+        
+        qr = qrcode.QRCode(
+            version=1,
+            error_correction=qrcode.constants.ERROR_CORRECT_L,
+            box_size=10,
+            border=4,
+        )
+        
+        full_url = f"http://{host}:{port}/{fileaddress}.zip"  
+        qr.add_data(full_url)
+        qr.make(fit=True)
+        
+        # Create an image from the QR code
+        img = qr.make_image(fill_color="black", back_color="white")
+        static_folder = f"{sharedir}/static_folder"
+        os.makedirs(static_folder, exist_ok=True)
+        img.save(os.path.join(static_folder, f'qrcode-{sharedir}.png'))
+        resized = img.resize((200,200))
+        
+        self.shareqr = ImageTk.PhotoImage(resized, size=(1, 1))
+        self.shareqr_label = ttk.Label(self.shareframe, image=self.shareqr)
+        self.shareqr_label.pack(side='top')
+        self.send_to_terminal("Server running, scan QR code to download", self.console_text)
+
+        
+        http_thread = threading.Thread(target=self.start_http_server, args=(host, int(port), fileaddress, sharedir))
+        http_thread.start()
+
+        self.send_to_terminal("QR code created. Scan to download", self.console_text)
+        
+
+    def start_http_server(self, host, port, fileaddress, sharedir):
+        """
+        Start an HTTP server that serves files and responds to GET requests.
+
+        Args:
+            host (str): The IP address or hostname of the server.
+            port (int): The port number to listen on.
+            fileaddress (str): The name of the file to serve.
+            sharedir (str): The directory where the file is located.
+        """
+        # Define the HTTP server handler
+        class MyHandler(http.server.SimpleHTTPRequestHandler):
+            file_downloaded = False
+
+            def do_GET(self):
+                """
+                Handle GET requests.
+
+                If the requested path matches the file address, set the file_downloaded flag to True
+                and respond with a success message. Then, remove the shared directory and close the server.
+                """
+                super().do_GET()
+                if self.path == f'/{fileaddress}.zip':
+                    # File is downloaded, set the flag
+                    self.file_downloaded = True
+                    # Respond to the client to ensure the file is fully downloaded
+                    self.send_response(200)
+                    self.end_headers()
+                    shutil.rmtree(sharedir)
+                    print("Done")
+                    self.server.server_close()
+
+        # Start HTTP server using socketserver with the customized handler
+        try:
+            with socketserver.TCPServer((host, port), MyHandler) as httpd:
+                print(f"HTTP server listening on {host}:{port}")
+
+                try:
+                    httpd.serve_forever()
+                except:
+                    print("Server stopped")
+        except:
+            self.send_to_terminal("Server still running", self.console_text)
+        
     def send_to_terminal(self, text, terminal_text, max_lines=36):
+        """
+        Appends the given text to the terminal_text widget, keeping only the last 'max_lines' lines.
+        
+        Args:
+            text (str): The text to be appended to the terminal_text widget.
+            terminal_text (tk.Text): The Text widget representing the terminal.
+            max_lines (int, optional): The maximum number of lines to keep in the terminal_text widget. Defaults to 36.
+        """
         if text == "":
             return
 
@@ -124,6 +297,9 @@ class MainWindow(tk.Tk):
         terminal_text.configure(state='disabled')
         
     def getdirectory(self,listbox:tk.Listbox):
+        """
+        Ask the user to select a directory and update the listbox with the selected files.
+        """
         selected_directory = filedialog.askopenfilenames()
         if(selected_directory == ""):
             return
@@ -134,6 +310,8 @@ class MainWindow(tk.Tk):
         
         for file in selected_directory:
             listbox.insert(tk.END, file)
+        
+        listbox.configure(state='normal')
             
         
         match listbox.get(0,1)[0][-3:]:
@@ -158,9 +336,78 @@ class MainWindow(tk.Tk):
                 self.convertto['values'] = ('txt','docx')
                 self.startbutton.configure(state='normal')
                 pass
+            
+            case"mp3":
+                self.convertto.set('')
+                self.conversionlabel.configure(text="Convert from MP3 to: ")
+                self.convertto['values'] = ('wav','flac')
+                self.startbutton.configure(state='normal')
+                pass
+            
+            case"lac":
+                self.convertto.set('')
+                self.conversionlabel.configure(text="Convert from FLAC to: ")
+                self.convertto['values'] = ('mp3','wav')
+                self.startbutton.configure(state='normal')
+                pass
+            
+            case"wav":
+                self.convertto.set('')
+                self.conversionlabel.configure(text="Convert from WAV to: ")
+                self.convertto['values'] = ('mp3','flac')
+                self.startbutton.configure(state='normal')
+                pass
+                
     
     def beginconvert(self):
+        """
+        Begins the conversion process.
+        """
+        # Send message to terminal
         self.send_to_terminal("Beginning conversion...", self.console_text)
+        
+        # Check if any files are selected
+        if self.listfiles.size() == 0:
+            self.send_to_terminal("No files selected, aborting...", self.console_text)
+            self.fileselector.configure(state='disabled')
+            return
+        
+        # Get the file type of the first selected file
+        filetype = self.listfiles.get(0, 1)[0][-3:]
+        
+        # Check if all selected files have the same type
+        files = []
+        for item in self.listfiles.get(0, tk.END):
+            if item[-3:] != filetype:
+                log = f"{item} is not of type {filetype}"
+                self.send_to_terminal(log, self.console_text)
+                showerror("Error", "All files must be the same type\n Aborting...") 
+                return
+            else:
+                log = f"{item} of type {filetype} has been added to queue"
+                self.send_to_terminal(log, self.console_text)
+                files.append(item)
+        
+        # Send message to terminal
+        self.send_to_terminal("Converting this may take a while =]", self.console_text)
+        
+        # Call the conversion function
+        Change.convert(files, self.convertto.get())
+        
+        # Send message to terminal
+        self.send_to_terminal("Done, check output folder to see results =]", self.console_text)
+        
+        # Clean up UI
+        self.convertto.set('')
+        self.listfiles.delete(0, tk.END)
+        self.conversionlabel.configure(text="Choose file or files to convert")
+        self.startbutton.configure(state='disabled')
+        
+        self.send_to_terminal("Beginning conversion...", self.console_text)
+        if self.listfiles.size() == 0:
+            self.send_to_terminal("No files selected, aborting...", self.console_text)
+            self.fileselector.configure(state='disabled')
+            return
         command = []
         filetype = self.listfiles.get(0,1)[0][-3:]
         files = []
