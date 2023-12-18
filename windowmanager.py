@@ -11,7 +11,7 @@ import http.server
 import socketserver
 import threading
 from PIL import Image, ImageTk
-
+import sys
 
 def on_entry_click(event, entry: tk.Entry):
     if entry.get() == directory_path:
@@ -34,6 +34,21 @@ def remove_file(listbox: tk.Listbox):
     
     return 0
 
+def resource_path(relative_path):
+    """ Get absolute path to resource, works for dev and for PyInstaller """
+    try:
+        # Check if the script is bundled with PyInstaller
+        if getattr(sys, 'frozen', False):
+            # PyInstaller creates a temp folder and stores path in _MEIPASS
+            base_path = sys._MEIPASS
+        else:
+            # Not bundled, use the current working directory
+            base_path = os.path.abspath(".")
+        
+        return os.path.join(base_path, relative_path)
+    except Exception as e:
+        print(f"Error in resource_path: {e}")
+        return None
 
 directory_path = "Enter directory of folder or file"
 
@@ -48,7 +63,8 @@ class MainWindow(tk.Tk):
         self.colors = ["#E5E9EC", "#D0D7DD", "#7C616C"]
         self.directory = tk.StringVar()
         self.command = tk.StringVar()
-        self.iconbitmap("icon/Change.ico")
+        icon_path = resource_path("icon/Change.ico")
+        self.iconbitmap(icon_path)
         self.ip = tk.StringVar()
         self.share_progress_var = tk.DoubleVar()
         self.share_progress_var.set(0.0)
@@ -144,31 +160,31 @@ class MainWindow(tk.Tk):
         
         
     def share(self):
-        
         try:
             self.shareframe.destroy()
             self.shareqr_label.destroy()
-
         except:
             pass
-        
+
         self.send_to_terminal("Beginning share, creating zip file", self.console_text)
         if self.sharefiles.get(0, tk.END) == ():
             self.send_to_terminal("No files selected", self.console_text)
             return
 
         sharedir = f"share-{random.randint(0, 100)}"
-        
+
         os.makedirs(sharedir, exist_ok=True)
-        os.makedirs(f'{sharedir}/share-rawfile', exist_ok=True)
+        os.makedirs(resource_path(f'{sharedir}/share-rawfile'), exist_ok=True)
+
         self.send_to_terminal("Copying files", self.console_text)
         for file in self.sharefiles.get(0, tk.END):
-            shutil.copy(file, f"{sharedir}/share-rawfile")
-            
-        fileaddress = f"{sharedir}/{sharedir}.zip"
+            shutil.copy(file, resource_path(f"{sharedir}/share-rawfile"))
+
+        fileaddress = resource_path(f"{sharedir}/{sharedir}")
         self.send_to_terminal("Done", self.console_text)
         self.send_to_terminal("Zipping files", self.console_text)
-        shutil.make_archive(fileaddress, 'zip', f"{sharedir}/share-rawfile")
+        shutil.make_archive(fileaddress, 'zip', resource_path(f"{sharedir}/share-rawfile"))
+
 
         self.send_to_terminal("Creating QR code", self.console_text)
 
@@ -182,36 +198,39 @@ class MainWindow(tk.Tk):
         host = address_parts[0]
         port = int(address_parts[1])
 
-        http_thread = threading.Thread(target=self.start_http_server, args=(host, int(port), fileaddress,sharedir))
+        http_thread = threading.Thread(target=self.start_http_server, args=(host, int(port),sharedir))
         http_thread.start()
 
         self.send_to_terminal("QR code created. Scan to download", self.console_text)
         
 
-    def start_http_server(self, host, port, fileaddress, sharedir):
-    # Define the HTTP server handler
+    def start_http_server(self, host, port, sharedir):
+        self.send_to_terminal(sharedir, self.console_text)
+        self.send_to_terminal(f'File will be in /{sharedir}/{sharedir}.zip', self.console_text)
+        # Define the HTTP server handler
         class MyHandler(http.server.SimpleHTTPRequestHandler):
             file_downloaded = False
-            server_instance = None
 
             def do_GET(self):
                 super().do_GET()
-                if self.path == f'/{fileaddress}.zip':
+                if self.path == f'/{sharedir}/{sharedir}.zip':
                     # File is downloaded, set the flag
                     self.file_downloaded = True
                     # Respond to the client to ensure the file is fully downloaded
                     self.send_response(200)
                     self.end_headers()
                     shutil.rmtree(sharedir)
-                    print("Done")
-                    self.server_instance.shutdown()
+                    try:
+                        self.server.server_close()
+                    except:
+                        return
+                    return
 
         # Attempt to bind to different ports until an available one is found
         for i in range(10):
             try:
                 current_port = port + i
                 with socketserver.TCPServer((host, current_port), MyHandler) as httpd:
-                    MyHandler.server_instance = httpd
                     print(f"HTTP server listening on {host}:{current_port}")
 
                     # Create QR code and display it
@@ -221,7 +240,8 @@ class MainWindow(tk.Tk):
                         box_size=10,
                         border=4,
                     )
-                    full_url = f"http://{host}:{current_port}/{fileaddress}.zip"
+                    
+                    full_url = f"http://{host}:{current_port}/{f'/{sharedir}/{sharedir}.zip'}"
                     qr.add_data(full_url)
                     qr.make(fit=True)
                     # Create an image from the QR code
@@ -231,10 +251,6 @@ class MainWindow(tk.Tk):
                     img.save(os.path.join(static_folder, f'qrcode-{sharedir}.png'))
                     resized = img.resize((200, 200))
 
-                    # Clear the previous frame
-                    if hasattr(self, 'shareframe'):
-                        self.shareframe.destroy()
-
                     # Display QR code
                     self.shareframe = ttk.Frame(self.lowerframe, style="Secondary.TFrame")
                     self.shareframe.pack(padx=5, pady=5, side="top")
@@ -243,29 +259,15 @@ class MainWindow(tk.Tk):
                     self.shareqr_label.pack(side='top')
 
                     # Start serving
-                    httpd_thread = threading.Thread(target=httpd.serve_forever)
-                    self.send_to_terminal(f"Server attempt on address {host}:{current_port}. Scan QR code to download", self.console_text)
-                    httpd_thread.start()
-
-                    # Wait for the file to be downloaded or an exception to occur
-                    httpd_thread.join()
-
-                    # Check if the file was downloaded successfully
-                    if MyHandler.file_downloaded:
-                        self.send_to_terminal(f"Server running on address {host}:{current_port}. Scan QR code to download", self.console_text)
-                        break
-                    else:
-                        self.send_to_terminal(f"Error starting server on port {current_port}. Trying the next one.", self.console_text)
-            except OSError as e:
-                if "Only one usage" in str(e):  # Port already in use
-                    self.send_to_terminal(f"Port {current_port} in use, trying the next one.", self.console_text)
-                    continue
-                else:
-                    raise  # Raise other OSError exceptions
-            except Exception as e:
-                self.send_to_terminal(f"Error starting server: {e}", self.console_text)
-                break
-
+                    self.send_to_terminal(f"Server attempt on address {host}:{current_port}", self.console_text)
+                    try: 
+                        httpd.serve_forever()
+                    except:
+                        self.send_to_terminal(f"Sent file at address {host}:{current_port}", self.console_text)
+                        return
+            except:
+                continue
+                    
         
     def send_to_terminal(self, text, terminal_text, max_lines=36):
         if text == "":
