@@ -14,7 +14,7 @@ The **Change** application is a Windows versatile file conversion tool that allo
   Download the latest released zip file and extract. Run Change.exe and convert some files.
 
 ## Screenshots
-  ![Model]((https://github.com/Axel-Negron/Change/blob/main/icon/Change.png))
+  ![Model](https://github.com/Axel-Negron/Change/blob/main/icon/Demo.png)
 ## Future Plans
 
 I plan onworking on enhancing the capabilities of the **Change** application. Future plans include the addition of audio file conversion support. Stay tuned for updates!
