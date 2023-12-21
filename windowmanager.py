@@ -1,17 +1,17 @@
 import tkinter as tk
 from tkinter import ttk
 from tkinter import filedialog
-from tkinter.messagebox import showerror, showwarning, showinfo
+from tkinter.messagebox import showerror
 import Change
 import qrcode
 import os
 import random
 import shutil
 import http.server
-import socketserver
 import threading
-from PIL import Image, ImageTk
+from PIL import ImageTk
 import sys
+
 
 def on_entry_click(event, entry: tk.Entry):
     if entry.get() == directory_path:
@@ -52,6 +52,51 @@ def resource_path(relative_path):
 
 directory_path = "Enter directory of folder or file"
 
+
+
+class CustomHandler(http.server.SimpleHTTPRequestHandler):
+    def __init__(self, *args, sharedir, server, **kwargs):
+        self.sharedir = sharedir
+        self.server = server
+        super().__init__(*args, **kwargs)
+
+    def do_GET(self):
+        try:
+            if self.path.startswith(f'/{self.sharedir}/'):
+                _, share_folder, file_name = self.path.split('/')
+                file_path = os.path.join(share_folder, file_name)
+                with open(file_path, 'rb') as file:
+                    self.send_response(200)
+                    self.send_header('Content-type', 'application/zip')
+                    self.end_headers()
+                    self.wfile.write(file.read())
+                    self.server.stop()
+                    return
+        except FileNotFoundError:
+            self.send_error(404, "File not found")
+        except Exception as e:
+            print(f"Exception in do_GET: {e}")
+
+class MyHttpServerThread(threading.Thread):
+    def __init__(self, address=("0.0.0.0", 8000), target_dir="."):
+        super().__init__()
+        self.address = address
+        self.target_dir = target_dir
+        self.server = http.server.HTTPServer(
+            address, lambda *args, **kwargs: CustomHandler(*args, sharedir=target_dir, server=self, **kwargs)
+        )
+
+    def run(self):
+        try:
+            self.server.serve_forever(poll_interval=1)
+        except Exception as e:
+            print(f"Exception in MyHttpServerThread: {e}")
+
+    def stop(self):
+        self.server.shutdown()
+
+
+
 class MainWindow(tk.Tk):
 
     def __init__(self):
@@ -65,9 +110,8 @@ class MainWindow(tk.Tk):
         self.command = tk.StringVar()
         icon_path = resource_path("icon/Change.ico")
         self.iconbitmap(icon_path)
-        self.ip = tk.StringVar()
-        self.share_progress_var = tk.DoubleVar()
-        self.share_progress_var.set(0.0)
+        self.http_thread = None
+        self.ipaddress = tk.StringVar()
         
 
         style = ttk.Style(self)
@@ -143,10 +187,11 @@ class MainWindow(tk.Tk):
         self.sharelbl.pack(side='top',anchor='nw')
         
         
-        self.useriplbl = ttk.Label(self.lowerframe, text="IP w/ port (example: 127.0.0.1:8000):",font=('Arial', 15, 'bold'), foreground='black', background=self.colors[0])
-        self.useriplbl.pack(side='top',anchor='nw')
-        self.userip = ttk.Entry(self.lowerframe, textvariable=self.ip,style="Console.TFrame")
-        self.userip.pack(side='top', anchor='nw', padx=5, pady=5,ipadx=240,ipady=10)
+        self.ip = ttk.Label(self.lowerframe, text="IP Address:",font=('Arial', 15, 'bold'), foreground='black', background=self.colors[0])
+        self.ip.pack(side='top',anchor='nw')
+        self.ipentry= ttk.Entry(self.lowerframe, textvariable=self.ipaddress,background='black',width=69)
+        self.ipentry.pack(side='top',anchor='nw')
+        
         self.sharefileslbl = ttk.Label(self.lowerframe, text="Queued files to share:",font=('Arial', 15, 'bold'), foreground='black', background=self.colors[0])
         self.sharefileslbl.pack(side='top',anchor='nw')
         self.sharefiles = tk.Listbox(self.lowerframe, width=70, height=2,background='black',foreground='white')
@@ -170,103 +215,69 @@ class MainWindow(tk.Tk):
         if self.sharefiles.get(0, tk.END) == ():
             self.send_to_terminal("No files selected", self.console_text)
             return
+        
+        for i in range(100):
+            try:
+                sharedir = f"share-{random.randint(0, 1000)}"
+                os.makedirs(sharedir, exist_ok=True)
+                os.makedirs(resource_path(f'{sharedir}/share-rawfile'), exist_ok=True)
 
-        sharedir = f"share-{random.randint(0, 100)}"
+                self.send_to_terminal("Copying files", self.console_text)
+                for file in self.sharefiles.get(0, tk.END):
+                    shutil.copy(file, resource_path(f"{sharedir}/share-rawfile"))
 
-        os.makedirs(sharedir, exist_ok=True)
-        os.makedirs(resource_path(f'{sharedir}/share-rawfile'), exist_ok=True)
-
-        self.send_to_terminal("Copying files", self.console_text)
-        for file in self.sharefiles.get(0, tk.END):
-            shutil.copy(file, resource_path(f"{sharedir}/share-rawfile"))
-
-        fileaddress = resource_path(f"{sharedir}/{sharedir}")
-        self.send_to_terminal("Done", self.console_text)
-        self.send_to_terminal("Zipping files", self.console_text)
-        shutil.make_archive(fileaddress, 'zip', resource_path(f"{sharedir}/share-rawfile"))
-
-
+                fileaddress = resource_path(f"{sharedir}/{sharedir}")
+                self.send_to_terminal("Done", self.console_text)
+                self.send_to_terminal("Zipping files", self.console_text)
+                shutil.make_archive(fileaddress, 'zip', resource_path(f"{sharedir}/share-rawfile"))
+                break
+            except:
+                self.send_to_terminal("Failed to create zip file, retrying with a different number", self.console_text)
+                continue
         self.send_to_terminal("Creating QR code", self.console_text)
 
-
-
-        address_parts = self.ip.get().split(':')
-        if len(address_parts) < 2:
-            self.send_to_terminal("No port specified, defaulting to 8000", self.console_text)
-            address_parts.append(8000)
-            pass
-        host = address_parts[0]
-        port = int(address_parts[1])
-
-        http_thread = threading.Thread(target=self.start_http_server, args=(host, int(port),sharedir))
-        http_thread.start()
-
-        self.send_to_terminal("QR code created. Scan to download", self.console_text)
+        ipv4 = self.ipaddress.get()
         
-
-    def start_http_server(self, host, port, sharedir):
-        self.send_to_terminal(sharedir, self.console_text)
-        self.send_to_terminal(f'File will be in /{sharedir}/{sharedir}.zip', self.console_text)
-        # Define the HTTP server handler
-        class MyHandler(http.server.SimpleHTTPRequestHandler):
-            file_downloaded = False
-
-            def do_GET(self):
-                super().do_GET()
-                if self.path == f'/{sharedir}/{sharedir}.zip':
-                    # File is downloaded, set the flag
-                    self.file_downloaded = True
-                    # Respond to the client to ensure the file is fully downloaded
-                    self.send_response(200)
-                    self.end_headers()
-                    shutil.rmtree(sharedir)
-                    try:
-                        self.server.server_close()
-                    except:
-                        return
-                    return
-
-        # Attempt to bind to different ports until an available one is found
-        for i in range(10):
+        for i in range(15):
             try:
-                current_port = port + i
-                with socketserver.TCPServer((host, current_port), MyHandler) as httpd:
-                    print(f"HTTP server listening on {host}:{current_port}")
+                port = 8000+i
 
-                    # Create QR code and display it
-                    qr = qrcode.QRCode(
-                        version=1,
-                        error_correction=qrcode.constants.ERROR_CORRECT_L,
-                        box_size=10,
-                        border=4,
-                    )
-                    
-                    full_url = f"http://{host}:{current_port}/{f'/{sharedir}/{sharedir}.zip'}"
-                    qr.add_data(full_url)
-                    qr.make(fit=True)
-                    # Create an image from the QR code
-                    img = qr.make_image(fill_color="black", back_color="white")
-                    static_folder = f"{sharedir}/static_folder"
-                    os.makedirs(static_folder, exist_ok=True)
-                    img.save(os.path.join(static_folder, f'qrcode-{sharedir}.png'))
-                    resized = img.resize((200, 200))
+                # Create a new instance of MyHttpServerThread
+                http_thread = MyHttpServerThread(address=(ipv4, port), target_dir=sharedir)
+                http_thread.start()
 
-                    # Display QR code
-                    self.shareframe = ttk.Frame(self.lowerframe, style="Secondary.TFrame")
-                    self.shareframe.pack(padx=5, pady=5, side="top")
-                    self.shareqr = ImageTk.PhotoImage(resized)
-                    self.shareqr_label = ttk.Label(self.shareframe, image=self.shareqr)
-                    self.shareqr_label.pack(side='top')
+                # Create QR code and display it
+                qr = qrcode.QRCode(
+                    version=1,
+                    error_correction=qrcode.constants.ERROR_CORRECT_L,
+                    box_size=10,
+                    border=4,
+                )
 
-                    # Start serving
-                    self.send_to_terminal(f"Server attempt on address {host}:{current_port}", self.console_text)
-                    try: 
-                        httpd.serve_forever()
-                    except:
-                        self.send_to_terminal(f"Sent file at address {host}:{current_port}", self.console_text)
-                        return
+                full_url = f"http://{ipv4}:{port}/{f'/{sharedir}/{sharedir}.zip'}"
+                qr.add_data(full_url)
+                qr.make(fit=True)
+                # Create an image from the QR code
+                img = qr.make_image(fill_color="black", back_color="white")
+                resized = img.resize((200, 200))
+
+                # Display QR code
+                self.shareframe = ttk.Frame(self.lowerframe, style="Secondary.TFrame")
+                self.shareframe.pack(padx=5, pady=5, side="top")
+                self.shareqr = ImageTk.PhotoImage(resized)
+                self.shareqr_label = ttk.Label(self.shareframe, image=self.shareqr)
+                self.shareqr_label.pack(side='top')
+
+                self.send_to_terminal("QR code created. Scan to download", self.console_text)
+                self.send_to_terminal(f"Server running on port : {port}", self.console_text)
+                break
+                
+                
             except:
+                self.send_to_terminal(f"Failed to bind to port {port}. Trying a different port...", self.console_text)
                 continue
+                
+        
                     
         
     def send_to_terminal(self, text, terminal_text, max_lines=36):
