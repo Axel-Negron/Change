@@ -1,17 +1,19 @@
 import tkinter as tk
 from tkinter import ttk
 from tkinter import filedialog
-from tkinter.messagebox import showerror
+from tkinter.messagebox import showerror, showwarning, showinfo
 import Change
 import qrcode
 import os
 import random
 import shutil
 import http.server
+import socketserver
 import threading
-from PIL import ImageTk
+from PIL import Image, ImageTk
 import sys
-
+import functools
+import socket
 
 def on_entry_click(event, entry: tk.Entry):
     if entry.get() == directory_path:
@@ -60,22 +62,27 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         self.server = server
         super().__init__(*args, **kwargs)
 
+    file_downloaded = False
+
     def do_GET(self):
         try:
             if self.path.startswith(f'/{self.sharedir}/'):
+                # Extract the filename from the path
                 _, share_folder, file_name = self.path.split('/')
+                # Construct the file path within the share-randomnumber folder
                 file_path = os.path.join(share_folder, file_name)
                 with open(file_path, 'rb') as file:
                     self.send_response(200)
                     self.send_header('Content-type', 'application/zip')
                     self.end_headers()
                     self.wfile.write(file.read())
-                    self.server.stop()
+                    self.server.stop()  # Signal the server to stop after serving the file
                     return
         except FileNotFoundError:
             self.send_error(404, "File not found")
         except Exception as e:
             print(f"Exception in do_GET: {e}")
+
 
 class MyHttpServerThread(threading.Thread):
     def __init__(self, address=("0.0.0.0", 8000), target_dir="."):
@@ -83,7 +90,7 @@ class MyHttpServerThread(threading.Thread):
         self.address = address
         self.target_dir = target_dir
         self.server = http.server.HTTPServer(
-            address, lambda *args, **kwargs: CustomHandler(*args, sharedir=target_dir, server=self, **kwargs)
+            address, functools.partial(CustomHandler, sharedir=target_dir, server=self)
         )
 
     def run(self):
@@ -94,7 +101,6 @@ class MyHttpServerThread(threading.Thread):
 
     def stop(self):
         self.server.shutdown()
-
 
 
 class MainWindow(tk.Tk):
@@ -234,6 +240,7 @@ class MainWindow(tk.Tk):
             except:
                 self.send_to_terminal("Failed to create zip file, retrying with a different number", self.console_text)
                 continue
+
         self.send_to_terminal("Creating QR code", self.console_text)
 
         ipv4 = self.ipaddress.get()
