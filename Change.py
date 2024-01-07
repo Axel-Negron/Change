@@ -141,14 +141,14 @@ def convert(input_lst,output_type):
                 
                 import ffmpeg
                 for file_directory in input_lst:
-                    ffmpeg.input(file_directory).output(f"output/{os.path.basename(file_directory)}.mp3").run()
+                    ffmpeg.input(file_directory).output(f"output/{os.path.basename(file_directory)}.mp3").run(overwrite_output=True  )
                 return
             
             if output_type == "flac":
                 
                 import ffmpeg
                 for file_directory in input_lst:
-                    ffmpeg.input(file_directory).output(f"output/{os.path.basename(file_directory)}.flac").run()
+                    ffmpeg.input(file_directory).output(f"output/{os.path.basename(file_directory)}.flac").run(overwrite_output=True)
                 return
          
                
