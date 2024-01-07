@@ -15,7 +15,7 @@ The **Change** application is a Windows versatile file conversion tool that allo
   Download the latest released zip file and extract. Run the run.bat file and thats it
 
 ## Screenshots
-  ![Model](https://github.com/Axel-Negron/Change/blob/main/icon/Demo.png)
+  ![Model](https://github.com/Axel-Negron/Change/blob/main/icon/Demo_image.png)
 ## Future Plans
 - Adding more convertion methods
 
