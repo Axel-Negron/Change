@@ -12,7 +12,7 @@ The **Change** application is a Windows versatile file conversion tool that allo
 ## Usage
 
 1. **Installation**
-  Download the latest released zip file and extract. Run the run.bat file and thats it.
+  Download the latest released zip file and extract. Run the run.bat file and thats it
 
 ## Screenshots
   ![Model](https://github.com/Axel-Negron/Change/blob/main/icon/Demo.png)
