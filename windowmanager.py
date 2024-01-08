@@ -213,7 +213,7 @@ class MainWindow(tk.Tk):
         parsed_input = self.command.get().split(' ')
         match cmd:
             case "help":
-                self.send_to_terminal("Available commands: help,clear,ls,cd,cwd,exit,copy,copy2,paste,copied?,rm,mkdir,convert", self.console_text)
+                self.send_to_terminal("Available commands: help,clear,ls,cd,cwd,exit,copy,copy2,paste,copied?,rm,mkdir,mkfile,convert", self.console_text)
                 
             case "clear":
                 self.console_text.delete('1.0', tk.END)
@@ -264,12 +264,21 @@ class MainWindow(tk.Tk):
             case "copy2":
                 if len(parsed_input)!=3:
                     self.send_to_terminal("Please provide a directory from and to in which to copy.", self.console_text)
-                else:
+                elif len(parsed_input) == 3:
                     try:
                         shutil.copy(parsed_input[1], parsed_input[2])
                         self.send_to_terminal("Files copied to path.", self.console_text)
                     except:
                         self.send_to_terminal("Error copying file/s to location.", self.console_text)
+                else:
+                    if self.copied == "":
+                        self.send_to_terminal("No files to copy.", self.console_text)
+                    else:
+                        try:
+                            for file in self.copied.split(","):
+                                shutil.copy(file, parsed_input[2])
+                        except:
+                            self.send_to_terminal("Error copying file/s to location.", self.console_text)
                     
             case "paste":
                 if self.copied == "":
