@@ -151,4 +151,12 @@ def convert(input_lst,output_type):
                     ffmpeg.input(file_directory).output(f"output/{os.path.basename(file_directory)}.flac").run(overwrite_output=True)
                 return
          
+        case"jpg":
+            if output_type == "png":
+                
+                from PIL import Image
+                for file_directory in input_lst:
+                    image = Image.open(file_directory)
+                    image.save(f"output/{os.path.basename(file_directory)}.png")
+                return
                

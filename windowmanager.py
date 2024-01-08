@@ -70,6 +70,8 @@ class MainWindow(tk.Tk):
         icon_path = resource_path("icon/Change.ico")
         self.iconbitmap(icon_path)
         self.sharelink = tk.StringVar()
+        self.cwd = os.getcwd()
+        self.copied = ""
 
         
         style = ttk.Style(self)
@@ -99,7 +101,7 @@ class MainWindow(tk.Tk):
             foreground=self.txtcolor[1],  # Set the text color
             background='black',
             height=35,
-            width=70
+            width=75
         )
         self.console_text.configure(state='disabled')
         self.console_text.pack(side='top', anchor='nw', padx=5, pady=5)
@@ -110,14 +112,14 @@ class MainWindow(tk.Tk):
             style="Console.TFrame",
             foreground=self.txtcolor[1]  # Set the text color
         )
-        self.userinput.pack(side='top', anchor='nw', padx=5, pady=5, ipadx=280, ipady=10)
+        self.userinput.pack(side='top', anchor='nw', padx=5, pady=5, ipadx=300, ipady=10)
 
-        self.userinput.bind('<Return>', lambda event: self.send_to_terminal(self.userinput.get(), self.console_text))
+        self.userinput.bind('<Return>', lambda event: self.user_input())
         
 
 
         self.lineframe = ttk.Frame(self.lowerframe, height=1000, width=1, style="Primary.TFrame")
-        self.lineframe.pack(side="left", anchor='nw',padx=(80,0))
+        self.lineframe.pack(side="left", anchor='nw',padx=(90,0))
 
         # Create a canvas widget
         
@@ -204,7 +206,206 @@ class MainWindow(tk.Tk):
             fg=self.txtcolor[0]
         )
         self.terminate_serverbtn.pack(side="top")
-       
+    
+    def user_input(self,):
+        self.console_text.configure(state='normal')
+        cmd = self.command.get().split(' ', 1)[0]
+        parsed_input = self.command.get().split(' ')
+        match cmd:
+            case "help":
+                self.send_to_terminal("Available commands: help,clear,ls,cd,cwd,exit,copy,copy2,paste,copied?,rm,mkdir,convert", self.console_text)
+                
+            case "clear":
+                self.console_text.delete('1.0', tk.END)
+                
+            case "ls":
+                for item in os.listdir(self.cwd):
+                    self.send_to_terminal(item, self.console_text)
+            
+            case "cd":
+                if len(parsed_input) == 1:
+                    self.send_to_terminal("Please provide a directory.", self.console_text)
+                    
+                elif parsed_input[1] == "..":
+                    self.cwd = os.path.abspath(os.path.join(self.cwd, os.path.pardir))
+                    self.send_to_terminal(f"CWD: {self.cwd}.", self.console_text)
+                else:
+                    try:
+                        if os.path.exists(os.path.join(self.cwd, parsed_input[1])):
+                            self.cwd = os.path.abspath(os.path.join(self.cwd, parsed_input[1]))
+                            self.send_to_terminal(f"CWD: {self.cwd}.", self.console_text)
+                        else:
+                            self.send_to_terminal(f"Directory: {os.path.join(self.cwd, parsed_input[1])} not found.", self.console_text)
+                    except:
+                        self.send_to_terminal("Directory not found.", self.console_text)
+            
+            case "cwd":
+                self.send_to_terminal(f"Directory: {self.cwd}", self.console_text)
+            
+            case "exit":
+                self.send_to_terminal("Exiting...", self.console_text)
+                exit()
+                
+            case "copy":
+                temp = ""
+                if len(parsed_input)==1:
+                    self.send_to_terminal("Please provide a directory to copy.", self.console_text)
+                else:
+                    try:
+                        for file in parsed_input[1:]:
+                            temp+=f"{file},"
+                            
+                        temp = temp[:-1]
+                        self.copied=temp
+                        self.send_to_terminal("Files copied.", self.console_text)
+                    except:
+                        self.send_to_terminal("Error copying file/s.", self.console_text)
+                        
+            case "copy2":
+                if len(parsed_input)!=3:
+                    self.send_to_terminal("Please provide a directory from and to in which to copy.", self.console_text)
+                else:
+                    try:
+                        shutil.copy(parsed_input[1], parsed_input[2])
+                        self.send_to_terminal("Files copied to path.", self.console_text)
+                    except:
+                        self.send_to_terminal("Error copying file/s to location.", self.console_text)
+                    
+            case "paste":
+                if self.copied == "":
+                    self.send_to_terminal("No files to paste.", self.console_text) 
+                    pass
+                
+                elif len(parsed_input) == 2:
+                    for file in self.copied.split(","):
+                        shutil.copy(file, parsed_input[1])
+                    self.send_to_terminal("Files pasted to directory.", self.console_text)
+                
+                elif len(parsed_input) == 1:
+                    for file in self.copied.split(","):
+                        shutil.copy(file, self.cwd)
+                    self.send_to_terminal("Files pasted to directory.", self.console_text)
+                                 
+                
+            case "copied?":
+                self.send_to_terminal(self.copied, self.console_text)   
+            
+            case "rm":
+                if len(parsed_input) < 2:
+                    self.send_to_terminal("Please provide a directory to remove.", self.console_text)
+                else:
+                    try:
+                        for file in parsed_input[1:]:
+                            if os.path.isdir(f"{self.cwd}/{file}"):
+                                shutil.rmtree(f"{self.cwd}/{file}")
+                                self.send_to_terminal("Folder/s removed.", self.console_text)
+                            else:
+                                os.remove(f"{self.cwd}/{file}")
+                                self.send_to_terminal("File/s removed.", self.console_text)
+                    except:
+                        self.send_to_terminal("Error removing file/s.", self.console_text)
+            
+            case "mkdir":
+                if len(parsed_input) == 1:
+                    self.send_to_terminal("Please provide a directory to create.", self.console_text)
+                else:
+                    try:
+                        for file in parsed_input[1:]:
+                            os.mkdir(f"{self.cwd}/{file}")
+                            self.send_to_terminal("Folder/s created.", self.console_text)
+                    except:
+                        self.send_to_terminal("Error creating folder/s.", self.console_text)
+            
+            case "mkfile":
+                if len(parsed_input) == 1:
+                    self.send_to_terminal("Please provide a file to create.", self.console_text)
+                else:
+                    try:
+                        for file in parsed_input[1:]:
+                            open(f"{self.cwd}/{file}", "w").close()
+                            self.send_to_terminal("File/s created.", self.console_text)
+                    except:
+                        self.send_to_terminal("Error creating file/s.", self.console_text)
+            
+            case "hello":
+                self.send_to_terminal("Hi!", self.console_text)
+            
+            case "hi":
+                self.send_to_terminal("Hello!", self.console_text)
+                
+            case "convert":
+                if len(parsed_input) == 1:
+                    self.send_to_terminal("Please provide a file to convert.", self.console_text)
+                else:
+                    try:
+                        for file in parsed_input[1:]:
+                            self.fileselector.insert(tk.END, file)
+                            if os.path.exists(file):
+                                self.listfiles.insert(tk.END,file)
+                                self.send_to_terminal(f"File: {file} added to queue.", self.console_text)
+                        self.listfiles.configure(state='normal')
+            
+                        self.convertto.set('')
+                        match self.listfiles.get(0,1)[0][-3:]:
+                            
+                            case"txt":
+                                self.conversionlabel.configure(text="Convert from TXT to: ")
+                                self.convertto['values'] = ('pdf','docx')
+                                pass
+                            
+                            case "ocx":
+                                self.conversionlabel.configure(text="Convert from DOCX to: ")
+                                self.convertto['values'] = ('txt','pdf')
+                                pass
+                            
+                            case"pdf":
+                                self.conversionlabel.configure(text="Convert from PDF to: ")
+                                self.convertto['values'] = ('txt','docx')
+                                pass
+                            
+                            case"mp3":
+                                self.conversionlabel.configure(text="Convert from MP3 to: ")
+                                self.convertto['values'] = ('wav','flac')
+                                pass
+                            
+                            case"lac":
+                                self.convertto.set('')
+                                self.conversionlabel.configure(text="Convert from FLAC to: ")
+                                self.convertto['values'] = ('mp3','wav')
+                                self.startbutton.configure(state=tk.NORMAL)
+                                pass
+                            
+                            case"wav":
+                                self.conversionlabel.configure(text="Convert from WAV to: ")
+                                self.convertto['values'] = ('mp3','flac')
+                                pass
+                            
+                            case"png":
+                                self.conversionlabel.configure(text="Convert from PNG to: ")
+                                self.convertto['values'] = ('JPG')
+                                
+                        self.startbutton.configure(state=tk.NORMAL)          
+                    except:
+                        self.send_to_terminal("Error adding to queue", self.console_text)
+            
+            case "open":
+                if len(parsed_input) == 1:
+                    self.send_to_terminal("Please provide a file to open.", self.console_text)
+                else:
+                    try:
+                        self.send_to_terminal("Opening file.", self.console_text)
+                        os.startfile(parsed_input[1])
+                    except:
+                        self.send_to_terminal("Error opening file.", self.console_text)
+            case _:
+                self.send_to_terminal(self.command.get(), self.console_text)
+  
+        self.userinput.delete(0, tk.END)
+        self.command.set("")
+        self.console_text.configure(state='disabled')
+        
+        return
+  
     def send_to_terminal(self, text, terminal_text, max_lines=35):
         if text == "":
             return
@@ -239,35 +440,27 @@ class MainWindow(tk.Tk):
         
         listbox.configure(state='normal')
             
-        
+        self.convertto.set('')
         match listbox.get(0,1)[0][-3:]:
+            
             case"txt":
-                self.convertto.set('')
                 self.conversionlabel.configure(text="Convert from TXT to: ")
                 self.convertto['values'] = ('pdf','docx')
-                self.startbutton.configure(state=tk.NORMAL)
-  
                 pass
             
             case "ocx":
-                self.convertto.set('')
                 self.conversionlabel.configure(text="Convert from DOCX to: ")
                 self.convertto['values'] = ('txt','pdf')
-                self.startbutton.configure(state=tk.NORMAL)
                 pass
             
             case"pdf":
-                self.convertto.set('')
                 self.conversionlabel.configure(text="Convert from PDF to: ")
                 self.convertto['values'] = ('txt','docx')
-                self.startbutton.configure(state=tk.NORMAL)
                 pass
             
             case"mp3":
-                self.convertto.set('')
                 self.conversionlabel.configure(text="Convert from MP3 to: ")
                 self.convertto['values'] = ('wav','flac')
-                self.startbutton.configure(state=tk.NORMAL)
                 pass
             
             case"lac":
@@ -278,12 +471,15 @@ class MainWindow(tk.Tk):
                 pass
             
             case"wav":
-                self.convertto.set('')
                 self.conversionlabel.configure(text="Convert from WAV to: ")
                 self.convertto['values'] = ('mp3','flac')
-                self.startbutton.configure(state=tk.NORMAL)
                 pass
             
+            case"png":
+                self.conversionlabel.configure(text="Convert from PNG to: ")
+                self.convertto['values'] = ('JPG')
+                
+        self.startbutton.configure(state=tk.NORMAL)  
                   
     def beginconvert(self):
         
