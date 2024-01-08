@@ -1,6 +1,6 @@
 # Change Application
 
-The **Change** application is a Windows versatile file conversion tool that allows you to convert between different document formats. As of now, the application supports the following formats: DOCX, TXT, and PDF,MP3,FLAC,WAV. You can convert both from and to each of these types seamlessly. You can also share your files locally from the program. Scan the qr code or navigate to the address and download.
+The **Change** application is a Windows versatile file conversion tool that allows you to convert between different document formats. As of now, the application supports the following formats: DOCX, TXT, PDF, MP3, FLAC and WAV. You can convert both from and to each of these types seamlessly. You can also share your files locally from the program. Scan the qr code or navigate to the address and download.
 
 ## Features
 
