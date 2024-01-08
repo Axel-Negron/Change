@@ -588,9 +588,6 @@ class MainWindow(tk.Tk):
             flask_process = subprocess.Popen(['python', 'flask_app.py'])
             print("Flask App is running.")
 
-            # ... rest of your code ...
-
-            # Optionally, wait for the Flask app to finish
             flask_process.wait()
         except KeyboardInterrupt:
             # Handle keyboard interrupt (e.g., Ctrl+C to terminate)
