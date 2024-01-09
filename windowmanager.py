@@ -14,6 +14,7 @@ import time
 import socket
 import qrcode
 from PIL import Image, ImageTk
+import zipfile
 
 def on_entry_click(event, entry: tk.Entry):
     if entry.get() == directory_path:
@@ -523,6 +524,7 @@ class MainWindow(tk.Tk):
         pass    
     
     def share(self):
+        file = self.listsharefiles.get(0, 'end')
         try:
             self.image_label.destroy()
         except:
@@ -530,9 +532,20 @@ class MainWindow(tk.Tk):
         if not os.path.exists('share'):
             os.mkdir('share')
 
-        if not self.listsharefiles.get(0, 'end'):
+        if not file:
             self.send_to_terminal("No files to share, returning...", self.console_text)
             return
+        elif len(file) == 1 and zipfile.is_zipfile(file[0]):
+            self.send_to_terminal("File is already a zip file, sending...", self.console_text)
+            if not os.path.exists("share.txt"):
+                with open(f"share.txt", 'x') as f:
+                    f.write(file[0])
+                    f.close()
+            else:
+                with open(f"share.txt", 'w') as f:
+                    f.write(file[0])
+                    f.close()
+            
         else:
             for i in range(50): 
                 try:
@@ -547,12 +560,7 @@ class MainWindow(tk.Tk):
                 
                 except:
                     continue
-                
-            self.send_to_terminal("Archive made, launching Flask app...", self.console_text)
-            self.send_to_terminal("Using your IPV4 address to access with port 5000...", self.console_text)
-            self.send_to_terminal(f"Your link: http://{self.getip()}:5000/download", self.console_text)
-
-
+            
             if not os.path.exists("share.txt"):
                 with open(f"share.txt", 'x') as f:
                     f.write(f"share/{path}/{path}.zip")
@@ -562,25 +570,36 @@ class MainWindow(tk.Tk):
                     f.write(f"share/{path}/{path}.zip")
                     f.close()
                     
-            
-            flask_thread = threading.Thread(target=self.run_flask_app)
-            flask_thread.start()
-            time.sleep(1)
-            self.terminate_serverbtn.configure(state=tk.NORMAL)
-            qr = qrcode.QRCode(version=3, box_size=5, border=3, error_correction=qrcode.constants.ERROR_CORRECT_H)
-            data = f'http://{self.getip()}:5000/download'
-            qr.add_data(data)
-            qr.make(fit=True)
-            img = qr.make_image(fill_color="black", back_color="white")
+        self.send_to_terminal("Archive made, launching Flask app...", self.console_text)
+        self.send_to_terminal("Using your IPV4 address to access with port 5000...", self.console_text)
+        self.send_to_terminal(f"Your link: http://{self.getip()}:5000/download", self.console_text)
+        flask_thread = threading.Thread(target=self.run_flask_app)
+        flask_thread.start()
+        time.sleep(1)
+        self.terminate_serverbtn.configure(state=tk.NORMAL)
+        qr = qrcode.QRCode(version=3, box_size=5, border=3, error_correction=qrcode.constants.ERROR_CORRECT_H)
+        data = f'http://{self.getip()}:5000/download'
+        qr.add_data(data)
+        qr.make(fit=True)
+        img = qr.make_image(fill_color="black", back_color="white")
+        try:
             img.save(f"share/{path}/qr_code.png")
             pil_image = Image.open(f"share/{path}/qr_code.png")
-            tk_image = ImageTk.PhotoImage(pil_image)
-            self.image_label = tk.Label(self.sharediv, image=tk_image)
-            self.image_label.pack(pady=10)
-            self.image_label.image = tk_image
+        except:
+            if os.path.exists("share/temp"):
+                shutil.rmtree("share/temp")
+            os.mkdir(f"share/temp")
+            img.save(f"share/temp/qr_code.png")
+            pil_image = Image.open(f"share/temp/qr_code.png")
+        
+        
+        tk_image = ImageTk.PhotoImage(pil_image)
+        self.image_label = tk.Label(self.sharediv, image=tk_image)
+        self.image_label.pack(pady=10)
+        self.image_label.image = tk_image
 
             
-            return
+        return
         
         
     def getip(self):
@@ -615,6 +634,8 @@ class MainWindow(tk.Tk):
         print(f"Server terminated: Result {result}")
         self.terminate_serverbtn.configure(state=tk.DISABLED)
         self.image_label.destroy()
+        if os.path.exists("share/temp"):
+            shutil.rmtree("share/temp")
 
 if __name__ == "__main__":
     flask_app = MainWindow()

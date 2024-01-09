@@ -9,7 +9,7 @@ zip_file_path = "share.txt"
 
 @app.route("/download")
 def download():
-    
+    print("Entered download route")
     with open(zip_file_path, 'r') as f:
         file_path = f.read()
     # Check if the zip file exists
