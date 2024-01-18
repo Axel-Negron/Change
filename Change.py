@@ -1,4 +1,5 @@
 import os
+from progress.bar import Bar
 
 def convert(input_lst,output_type):
     type = input_lst[0][-3:]
@@ -160,3 +161,18 @@ def convert(input_lst,output_type):
                     image.save(f"output/{os.path.basename(file_directory)}.png")
                 return
                
+        case "ptx":
+            if output_type =="pdf":
+                print("This may take a while")
+                barlen = len(input_lst)
+                bar = Bar('Processing', max=barlen)
+                import spire.presentation
+                import spire.presentation.common
+                for file_directory in input_lst:
+                    presentation = spire.presentation.Presentation()
+                    presentation.LoadFromFile(file_directory)
+                    presentation.SaveToFile(f"output/{os.path.basename(file_directory)}.pdf",spire.presentation.FileFormat.PDF)
+                    presentation.Dispose()
+                    bar.next()
+                bar.finish()
+            return

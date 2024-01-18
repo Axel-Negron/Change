@@ -4,8 +4,13 @@ ffmpeg_python==0.2.0
 Flask==3.0.0
 pdf2docx==0.5.6
 Pillow==10.2.0
+progress==1.6
 pydub==0.25.1
 PyPDF2==3.0.1
 python_docx==1.1.0
 qrcode==7.4.2
 reportlab==4.0.8
+Spire.Doc==12.1.0
+Spire.Pdf==10.1.1
+Spire.Presentation==9.1.0
+Spire.Xls==13.12.6

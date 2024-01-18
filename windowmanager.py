@@ -487,7 +487,12 @@ class MainWindow(tk.Tk):
             
             case"png":
                 self.conversionlabel.configure(text="Convert from PNG to: ")
-                self.convertto['values'] = ('JPG')
+                self.convertto['values'] = ('jpg')
+                
+            case"ptx":
+                self.conversionlabel.configure(text="Convert from PPTX/PTX to: ")
+                self.convertto['values'] = ('pdf')
+                
                 
         self.startbutton.configure(state=tk.NORMAL)  
                   
@@ -638,5 +643,6 @@ class MainWindow(tk.Tk):
             shutil.rmtree("share/temp")
 
 if __name__ == "__main__":
-    flask_app = MainWindow()
-    flask_app.mainloop()
+    changeapp = MainWindow()
+    changeapp.mainloop()
+    
